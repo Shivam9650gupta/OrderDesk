@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Order Desk — paste to CSV</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#e9edf1;--card:#ffffff;--ink:#141d26;--muted:#5d6b7a;
+  --line:#ccd5de;--line-soft:#e3e9ef;--blue:#0f5e9c;--blue-ink:#0a406b;
+  --red:#a32020;--red-bg:#fdecec;--amber:#8a5212;--amber-bg:#fdf3e2;
+  --btn-ink:#ffffff;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  color-scheme:light dark;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#10161d;--card:#18212b;--ink:#e7edf3;--muted:#93a3b3;
+    --line:#2e3d4c;--line-soft:#243039;--blue:#6fb3e8;--blue-ink:#9ccbf2;
+    --red:#f08b8b;--red-bg:#2e1b1b;--amber:#e0b072;--amber-bg:#2c2415;
+    --btn-ink:#0b1218;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#10161d;--card:#18212b;--ink:#e7edf3;--muted:#93a3b3;
+  --line:#2e3d4c;--line-soft:#243039;--blue:#6fb3e8;--blue-ink:#9ccbf2;
+  --red:#f08b8b;--red-bg:#2e1b1b;--amber:#e0b072;--amber-bg:#2c2415;--btn-ink:#0b1218;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--paper);color:var(--ink);
+ font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+ font-size:15px;line-height:1.5;-webkit-text-size-adjust:100%}
+.mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace}
+header.bar{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+ padding:18px 22px;border-bottom:1px solid var(--line);background:var(--card)}
+header.bar h1{font-size:20px;font-weight:600;margin:0;letter-spacing:-.01em}
+header.bar p{margin:0;color:var(--muted);font-size:13.5px}
+.count{margin-left:auto;font-size:13.5px;color:var(--muted)}
+.count b{color:var(--ink);font-weight:600}
+main{display:grid;grid-template-columns:minmax(320px,390px) 1fr}
+@media (max-width:900px){main{grid-template-columns:1fr}}
+.pane-left{border-right:1px solid var(--line);padding:20px;background:var(--card)}
+@media (max-width:900px){.pane-left{border-right:0;border-bottom:1px solid var(--line)}}
+.pane-right{padding:20px;min-width:0}
+label.field{display:block;font-size:13px;color:var(--muted);margin:0 0 6px}
+textarea#paste{width:100%;min-height:270px;resize:vertical;padding:12px 13px;
+ border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink);
+ font-family:"IBM Plex Mono",monospace;font-size:13.5px;line-height:1.55}
+textarea#paste:focus,input:focus,select:focus,button:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+.row-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+button{font:inherit;font-size:14px;border-radius:6px;border:1px solid var(--line);
+ background:var(--card);color:var(--ink);padding:9px 14px;cursor:pointer}
+button:hover{border-color:var(--blue)}
+button.primary{background:var(--blue);border-color:var(--blue);color:var(--btn-ink);font-weight:600}
+button.primary:hover{background:var(--blue-ink);border-color:var(--blue-ink)}
+button.ghost{background:transparent;color:var(--muted)}
+.hint{font-size:12.5px;color:var(--muted);margin:14px 0 0;padding-top:12px;border-top:1px dashed var(--line-soft)}
+.hint code{font-family:"IBM Plex Mono",monospace;font-size:12px;background:var(--paper);padding:1px 4px;border-radius:3px}
+details.settings{margin-top:16px;border-top:1px solid var(--line-soft);padding-top:12px}
+details.settings summary{cursor:pointer;font-size:13.5px;color:var(--blue)}
+.gridset{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.gridset .full{grid-column:1/-1}
+.gridset label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+.gridset input,.gridset select{width:100%;padding:7px 9px;border:1px solid var(--line);
+ border-radius:5px;background:var(--paper);color:var(--ink);font:inherit;font-size:13.5px}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th{text-align:left;font-weight:600;font-size:12.5px;color:var(--muted);padding:9px 8px;
+ border-bottom:1px solid var(--line);white-space:nowrap;position:sticky;top:0;background:var(--card);z-index:2}
+td{padding:4px 6px;border-bottom:1px solid var(--line-soft);vertical-align:middle}
+tbody tr:hover{background:var(--paper)}
+td input,td select{width:100%;min-width:62px;border:1px solid transparent;background:transparent;
+ color:var(--ink);font:inherit;font-size:13.5px;padding:5px 6px;border-radius:4px}
+td input:hover,td select:hover{border-color:var(--line)}
+td input:focus,td select:focus{border-color:var(--blue);background:var(--card)}
+td input.num{font-family:"IBM Plex Mono",monospace;text-align:right}
+td input.code{font-family:"IBM Plex Mono",monospace}
+.w-name{min-width:145px}.w-addr{min-width:220px}.w-prod{min-width:215px}
+.w-city{min-width:115px}.w-state{min-width:145px}.w-sm{width:76px}.w-xs{width:58px}
+input.bad,select.bad{background:var(--red-bg);border-color:var(--red)}
+.rowbtn{border:1px solid var(--line);background:var(--card);color:var(--muted);
+ border-radius:5px;padding:3px 8px;font-size:12.5px;cursor:pointer;white-space:nowrap}
+.rowbtn:hover{border-color:var(--blue);color:var(--blue)}
+.del{border:0;background:none;color:var(--muted);cursor:pointer;font-size:17px;line-height:1;padding:4px 8px}
+.del:hover{color:var(--red)}
+.empty{padding:46px 20px;text-align:center;color:var(--muted);border:1px dashed var(--line);
+ border-radius:8px;background:var(--card)}
+.empty b{display:block;color:var(--ink);font-weight:600;margin-bottom:4px}
+.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.toolbar .spacer{flex:1}
+.flags{margin-bottom:12px;font-size:13px;padding:9px 12px;border-radius:6px;display:none}
+.flags.show{display:block}
+.flags.err{background:var(--red-bg);color:var(--red);border:1px solid currentColor}
+#scrim{position:fixed;inset:0;background:rgba(10,20,30,.42);opacity:0;pointer-events:none;
+ transition:opacity .16s ease;z-index:40}
+#scrim.show{opacity:1;pointer-events:auto}
+#drawer{position:fixed;top:0;right:0;height:100%;width:min(560px,100%);background:var(--card);
+ border-left:1px solid var(--line);z-index:41;transform:translateX(100%);transition:transform .2s ease;
+ display:flex;flex-direction:column}
+#drawer.show{transform:none}
+.dhead{display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid var(--line);
+ padding-top:calc(16px + env(safe-area-inset-top,0px))}
+.dhead h2{margin:0;font-size:16px;font-weight:600}
+.dhead .spacer{flex:1}
+.dbody{overflow-y:auto;padding:4px 20px 28px;flex:1;
+ padding-bottom:calc(28px + env(safe-area-inset-bottom,0px))}
+.dgroup{margin-top:20px}
+.dgroup h3{font-size:13px;font-weight:600;color:var(--muted);margin:0 0 10px;
+ padding-bottom:6px;border-bottom:1px solid var(--line-soft)}
+.dfields{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.dfields .full{grid-column:1/-1}
+.dfields label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+.dfields .req{color:var(--red)}
+.dfields input,.dfields select{width:100%;padding:8px 10px;border:1px solid var(--line);
+ border-radius:5px;background:var(--paper);color:var(--ink);font:inherit;font-size:14px}
+.dfields input.bad{background:var(--red-bg);border-color:var(--red)}
+.smallnote{font-size:12px;color:var(--muted);margin:10px 0 0}
+#toast{position:fixed;left:50%;transform:translateX(-50%);
+ bottom:calc(22px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--paper);
+ padding:10px 16px;border-radius:6px;font-size:13.5px;opacity:0;pointer-events:none;
+ transition:opacity .18s ease;z-index:60}
+#toast.show{opacity:1}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <h1>Order Desk</h1>
+  <p>Paste a customer message, check the row, download the upload sheet.</p>
+  <div class="count">Queue: <b id="qcount">0</b></div>
+</header>
+
+<main>
+  <section class="pane-left">
+    <label class="field" for="paste">Paste the message here. Separate multiple orders with a line of three dashes.</label>
+    <textarea id="paste" spellcheck="false" placeholder="Vansh sable
+Kawtha Kamthi Nagpur forno tech kampani
+441002
+9834551458
+
+Iphone 16 converter
+
+Colour ;- orange
+
+30 rec
+799 COD"></textarea>
+    <div class="row-actions">
+      <button class="primary" id="addBtn">Parse and add</button>
+      <button class="ghost" id="clearPaste">Clear box</button>
+      <button class="ghost" id="sampleBtn">Load example</button>
+    </div>
+
+    <details class="settings">
+      <summary>Defaults filled into every new row</summary>
+      <div class="gridset" id="setGrid"></div>
+    </details>
+
+    <p class="hint">
+      Lines are picked out by shape, not by position: a 6-digit line is the pincode, a 10-digit line is the mobile,
+      a line with <code>COD</code> or <code>Prepaid</code> is the payment and the cost.
+      Everything before the pincode becomes name and address, everything after becomes the product.
+      City comes from the address text, state from the pincode. Lines like <code>30 rec</code> are ignored.
+      Order ID is left blank. Use <b>All fields</b> on any row to fill the other sheet columns.
+    </p>
+  </section>
+
+  <section class="pane-right">
+    <div class="toolbar">
+      <button class="primary" id="csvBtn">Download CSV</button>
+      <button id="copyBtn">Copy as CSV</button>
+      <div class="spacer"></div>
+      <button class="ghost" id="clearAll">Clear queue</button>
+    </div>
+    <div class="flags err" id="flagErr"></div>
+    <div id="tableHost"></div>
+  </section>
+</main>
+
+<div id="scrim"></div>
+<aside id="drawer" role="dialog" aria-modal="true" aria-labelledby="dtitle" aria-hidden="true">
+  <div class="dhead">
+    <h2 id="dtitle">All fields</h2>
+    <div class="spacer"></div>
+    <button id="dPrev" class="rowbtn">Previous</button>
+    <button id="dNext" class="rowbtn">Next</button>
+    <button id="dClose" class="rowbtn">Close</button>
+  </div>
+  <div class="dbody" id="dBody"></div>
+</aside>
+
+<div id="toast"></div>
+
+<script>
+(function(){
+"use strict";
+
+var HEADERS = ["Order ID","Order Date","Order Tags","Channel","Pickup Address ID*","Is Document (Yes/No)*","Payment Method (COD/Prepaid)*","Buyer's Full Name*","Buyer's Email","Buyer's Mobile No.*","Buyer's GSTIN","E-way Bill Number","Shipping Complete Address*","Shipping Address Landmark","Shipping Address State*","Shipping Address City*","Shipping Address Pincode*","Billing Full Name","Billing Email","Billing Mobile No.","Billing Complete Address","Billing Landmark","Billing State","Billing City","Billing Pincode","Resller Name","Shipment Weight (Kgs)*","Shipment Length (cm)*","Shipment Breadth (cm)*","Shipment Height (cm)*","Partial COD (Yes/No)","Collectable Amount","Shipping Charges","COD Charges","Total Discount","Other Charges","Product SKU (1)","Product Name (1)*","Product Quantity (1)*","Product Unit Price (1)*","Product Discount (1)","Product HSN Code (1)","Product Tax % (1)","Product SKU (2)","Product Name (2)","Product Quantity (2)","Product Unit Price (2)","Product Discount (2)","Product HSN Code (2)","Product Tax % (2)","(Upto 10 SKUs)"];
+var N = HEADERS.length;
+
+var C = {
+  orderId:0, date:1, tags:2, channel:3, pickup:4, isDoc:5, pay:6,
+  name:7, email:8, phone:9, gstin:10, eway:11,
+  addr:12, landmark:13, state:14, city:15, pin:16,
+  bName:17, bEmail:18, bPhone:19, bAddr:20, bLandmark:21, bState:22, bCity:23, bPin:24,
+  reseller:25, weight:26, len:27, bre:28, hei:29,
+  partial:30, collect:31, shipChg:32, codChg:33, discount:34, otherChg:35,
+  sku1:36, prod1:37, qty1:38, price1:39, disc1:40, hsn1:41, tax1:42,
+  sku2:43, prod2:44, qty2:45, price2:46, disc2:47, hsn2:48, tax2:49
+};
+
+var REQUIRED = [4,5,6,7,9,12,14,15,16,26,27,28,29,37,38,39];
+var YESNO = [5,30];
+var NUMERIC = [26,27,28,29,31,32,33,34,35,38,39,40,42,45,46,47,49];
+
+var GROUPS = [
+  {t:"Order",             f:[0,1,2,3,4,5,6]},
+  {t:"Buyer",             f:[7,9,8,10,11]},
+  {t:"Shipping address",  f:[12,13,16,15,14]},
+  {t:"Billing address",   f:[17,19,18,20,21,24,23,22], copy:true},
+  {t:"Shipment",          f:[25,26,27,28,29]},
+  {t:"Charges",           f:[30,31,32,33,34,35]},
+  {t:"Product 1",         f:[37,36,38,39,40,41,42]},
+  {t:"Product 2",         f:[44,43,45,46,47,48,49]}
+];
+var WIDE = [12,20,37,44,2];
+
+var PIN = [
+ [110,110,"Delhi"],[111,119,"Delhi"],[121,128,"Haryana"],[131,136,"Haryana"],
+ [140,148,"Punjab"],[151,152,"Punjab"],[160,160,"Chandigarh"],[161,164,"Punjab"],
+ [171,177,"Himachal Pradesh"],[180,185,"Jammu and Kashmir"],[190,193,"Jammu and Kashmir"],[194,194,"Ladakh"],
+ [201,212,"Uttar Pradesh"],[221,233,"Uttar Pradesh"],[241,245,"Uttar Pradesh"],[246,246,"Uttarakhand"],
+ [247,247,"Uttar Pradesh"],[248,249,"Uttarakhand"],[250,251,"Uttar Pradesh"],[261,261,"Uttar Pradesh"],
+ [262,263,"Uttarakhand"],[264,285,"Uttar Pradesh"],
+ [301,345,"Rajasthan"],[360,396,"Gujarat"],
+ [400,402,"Maharashtra"],[403,403,"Goa"],[404,445,"Maharashtra"],
+ [450,488,"Madhya Pradesh"],[490,497,"Chhattisgarh"],
+ [500,509,"Telangana"],[515,535,"Andhra Pradesh"],[560,591,"Karnataka"],
+ [600,604,"Tamil Nadu"],[605,605,"Puducherry"],[606,643,"Tamil Nadu"],
+ [670,695,"Kerala"],
+ [700,736,"West Bengal"],[737,737,"Sikkim"],[738,743,"West Bengal"],[744,744,"Andaman and Nicobar Islands"],
+ [751,770,"Odisha"],[781,788,"Assam"],[790,792,"Arunachal Pradesh"],[793,794,"Meghalaya"],
+ [795,795,"Manipur"],[796,796,"Mizoram"],[797,798,"Nagaland"],[799,799,"Tripura"],
+ [800,805,"Bihar"],[811,813,"Bihar"],[814,816,"Jharkhand"],[821,824,"Bihar"],
+ [825,829,"Jharkhand"],[831,835,"Jharkhand"],[841,855,"Bihar"]
+];
+
+var STATES = ["Andaman and Nicobar Islands","Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chandigarh","Chhattisgarh","Dadra and Nagar Haveli and Daman and Diu","Delhi","Goa","Gujarat","Haryana","Himachal Pradesh","Jammu and Kashmir","Jharkhand","Karnataka","Kerala","Ladakh","Lakshadweep","Madhya Pradesh","Maharashtra","Manipur","Meghalaya","Mizoram","Nagaland","Odisha","Puducherry","Punjab","Rajasthan","Sikkim","Tamil Nadu","Telangana","Tripura","Uttar Pradesh","Uttarakhand","West Bengal"];
+
+var CITIES = ["Mumbai","Navi Mumbai","Thane","Kalyan","Dombivli","Vasai","Virar","Mira Road","Bhiwandi","Panvel","Ambernath","Badlapur","Ulhasnagar","Pune","Pimpri","Chinchwad","Nagpur","Kamthi","Kamptee","Wardha","Chandrapur","Gondia","Bhandara","Amravati","Akola","Yavatmal","Nanded","Latur","Solapur","Sangli","Kolhapur","Satara","Ahmednagar","Nashik","Jalgaon","Dhule","Aurangabad","Jalna","Parbhani","Beed","Osmanabad","Ratnagiri","Alibag",
+"Delhi","New Delhi","Noida","Greater Noida","Ghaziabad","Faridabad","Gurgaon","Gurugram","Sonipat","Panipat","Karnal","Ambala","Hisar","Rohtak","Bhiwani","Rewari","Yamunanagar","Kurukshetra","Sirsa","Jind",
+"Chandigarh","Mohali","Panchkula","Ludhiana","Amritsar","Jalandhar","Patiala","Bathinda","Pathankot","Hoshiarpur","Moga","Firozpur",
+"Shimla","Solan","Mandi","Dharamshala","Kullu","Una","Bilaspur","Hamirpur",
+"Srinagar","Jammu","Anantnag","Baramulla","Udhampur","Kathua","Leh",
+"Lucknow","Kanpur","Agra","Varanasi","Prayagraj","Allahabad","Meerut","Bareilly","Aligarh","Moradabad","Gorakhpur","Jhansi","Mathura","Firozabad","Saharanpur","Muzaffarnagar","Rampur","Shahjahanpur","Ayodhya","Faizabad","Sultanpur","Azamgarh","Mirzapur","Etawah","Banda","Basti","Deoria","Ballia","Jaunpur","Hardoi","Sitapur","Unnao","Raebareli","Bulandshahr","Hapur","Bijnor","Amroha","Budaun","Pilibhit","Mainpuri","Farrukhabad","Fatehpur","Barabanki","Gonda","Bahraich",
+"Dehradun","Haridwar","Roorkee","Rishikesh","Haldwani","Nainital","Rudrapur","Kashipur","Almora","Pithoragarh",
+"Jaipur","Jodhpur","Udaipur","Kota","Ajmer","Bikaner","Alwar","Bhilwara","Sikar","Pali","Sri Ganganagar","Bharatpur","Chittorgarh","Jhunjhunu","Nagaur","Banswara","Hanumangarh","Tonk","Dausa","Barmer","Jaisalmer",
+"Ahmedabad","Surat","Vadodara","Rajkot","Bhavnagar","Jamnagar","Gandhinagar","Junagadh","Anand","Nadiad","Bharuch","Ankleshwar","Navsari","Valsad","Vapi","Mehsana","Morbi","Bhuj","Gandhidham","Porbandar","Palanpur","Godhra","Patan","Amreli","Veraval","Silvassa","Daman",
+"Panaji","Margao","Vasco da Gama","Mapusa",
+"Bhopal","Indore","Jabalpur","Gwalior","Ujjain","Sagar","Dewas","Satna","Ratlam","Rewa","Katni","Singrauli","Burhanpur","Khandwa","Chhindwara","Vidisha","Shivpuri","Guna","Damoh","Mandsaur","Neemuch","Morena","Bhind","Sehore","Hoshangabad","Itarsi","Betul","Balaghat","Seoni",
+"Raipur","Bhilai","Durg","Korba","Raigarh","Jagdalpur","Ambikapur","Rajnandgaon","Dhamtari",
+"Hyderabad","Secunderabad","Warangal","Nizamabad","Karimnagar","Khammam","Ramagundam","Mahbubnagar","Adilabad","Suryapet","Siddipet","Nalgonda","Medak",
+"Visakhapatnam","Vijayawada","Guntur","Nellore","Tirupati","Rajahmundry","Kakinada","Kurnool","Anantapur","Kadapa","Eluru","Ongole","Vizianagaram","Srikakulam","Chittoor","Machilipatnam","Narasaraopet","Bhimavaram",
+"Bengaluru","Bangalore","Mysuru","Mysore","Hubli","Dharwad","Belagavi","Belgaum","Mangaluru","Mangalore","Kalaburagi","Gulbarga","Davanagere","Ballari","Bellary","Shivamogga","Shimoga","Tumakuru","Tumkur","Bidar","Hassan","Udupi","Raichur","Vijayapura","Bijapur","Chitradurga","Kolar","Mandya","Karwar",
+"Chennai","Coimbatore","Madurai","Tiruchirappalli","Trichy","Salem","Tirunelveli","Tiruppur","Erode","Vellore","Thoothukudi","Thanjavur","Dindigul","Cuddalore","Kanchipuram","Karur","Namakkal","Nagercoil","Hosur","Sivakasi","Pollachi","Rajapalayam","Ooty","Kumbakonam","Villupuram","Tiruvannamalai","Puducherry","Pondicherry",
+"Thiruvananthapuram","Trivandrum","Kochi","Ernakulam","Kozhikode","Calicut","Thrissur","Kollam","Alappuzha","Palakkad","Kannur","Kottayam","Malappuram","Manjeri","Thalassery","Pathanamthitta","Idukki","Kasaragod","Guruvayur",
+"Kolkata","Howrah","Durgapur","Asansol","Siliguri","Bardhaman","Malda","Kharagpur","Haldia","Darjeeling","Jalpaiguri","Krishnanagar","Barasat","Berhampore","Bankura","Purulia","Cooch Behar",
+"Gangtok","Port Blair",
+"Bhubaneswar","Cuttack","Rourkela","Berhampur","Sambalpur","Puri","Balasore","Bhadrak","Baripada","Jeypore","Angul","Jharsuguda",
+"Guwahati","Dibrugarh","Silchar","Jorhat","Nagaon","Tinsukia","Tezpur","Bongaigaon","Itanagar","Shillong","Imphal","Aizawl","Kohima","Dimapur","Agartala",
+"Patna","Gaya","Bhagalpur","Muzaffarpur","Darbhanga","Purnia","Arrah","Begusarai","Katihar","Munger","Chapra","Saharsa","Sasaram","Hajipur","Siwan","Motihari","Bettiah","Samastipur","Nawada","Jehanabad","Buxar","Kishanganj",
+"Ranchi","Jamshedpur","Dhanbad","Bokaro","Deoghar","Hazaribagh","Giridih","Ramgarh","Phusro","Medininagar","Chaibasa","Dumka"];
+
+var SETTING_FIELDS = [
+  {c:C.pickup,  label:"Pickup address ID",   def:"WH-025"},
+  {c:C.channel, label:"Channel",             def:"Manual"},
+  {c:C.tags,    label:"Order tags",          def:"", full:true},
+  {c:C.isDoc,   label:"Is document",         def:"No", yesno:true},
+  {c:C.reseller,label:"Reseller name",       def:""},
+  {c:C.gstin,   label:"Buyer's GSTIN",       def:""},
+  {c:C.weight,  label:"Weight (kg)",         def:"0.5"},
+  {c:C.len,     label:"Length (cm)",         def:"20"},
+  {c:C.bre,     label:"Breadth (cm)",        def:"15"},
+  {c:C.hei,     label:"Height (cm)",         def:"10"},
+  {c:C.shipChg, label:"Shipping charges",    def:"0"},
+  {c:C.codChg,  label:"COD charges",         def:"0"},
+  {c:C.discount,label:"Total discount",      def:"0"},
+  {c:C.otherChg,label:"Other charges",       def:"0"},
+  {c:C.hsn1,    label:"HSN code",            def:""},
+  {c:C.tax1,    label:"Tax %",               def:""},
+  {c:C.sku1,    label:"SKU",                 def:""}
+];
+
+var EXTRA = { priceMode:"unit", copyBilling:"yes" };
+
+var MIRROR = {};
+MIRROR[C.name]=C.bName; MIRROR[C.email]=C.bEmail; MIRROR[C.phone]=C.bPhone;
+MIRROR[C.addr]=C.bAddr; MIRROR[C.landmark]=C.bLandmark;
+MIRROR[C.state]=C.bState; MIRROR[C.city]=C.bCity; MIRROR[C.pin]=C.bPin;
+
+var K_S="od.set.v2", K_O="od.orders.v2";
+var S={}, orders=[], openIdx=-1;
+
+function load(k,fb){ try{ var v=localStorage.getItem(k); return v?JSON.parse(v):fb; }catch(e){ return fb; } }
+function save(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+function el(id){ return document.getElementById(id); }
+function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function toast(m){ var t=el("toast"); t.textContent=m; t.classList.add("show");
+  clearTimeout(toast._t); toast._t=setTimeout(function(){ t.classList.remove("show"); },2200); }
+
+(function initSettings(){
+  var saved=load(K_S,{})||{};
+  SETTING_FIELDS.forEach(function(f){ S["c"+f.c] = saved["c"+f.c]!==undefined ? saved["c"+f.c] : f.def; });
+  Object.keys(EXTRA).forEach(function(k){ S[k] = saved[k]!==undefined ? saved[k] : EXTRA[k]; });
+})();
+orders = load(K_O,[])||[];
+orders = orders.filter(function(r){ return Array.isArray(r); }).map(function(r){
+  var a=new Array(N).fill(""); for(var i=0;i<N && i<r.length;i++) a[i]=r[i]==null?"":String(r[i]); return a;
+});
+if(S.copyBilling==="yes"){
+  orders.forEach(function(r){ if(!String(r[C.bName]||"").trim() && !String(r[C.bAddr]||"").trim()) copyBilling(r); });
+  save(K_O,orders);
+}
+
+function today(){ var d=new Date(), p=function(n){return (n<10?"0":"")+n;};
+  return p(d.getDate())+"/"+p(d.getMonth()+1)+"/"+d.getFullYear(); }
+
+function stateFromPin(pin){
+  if(!/^\d{6}$/.test(pin)) return "";
+  var p=parseInt(pin.slice(0,3),10);
+  for(var i=0;i<PIN.length;i++){ if(p>=PIN[i][0]&&p<=PIN[i][1]) return PIN[i][2]; }
+  return "";
+}
+function cityFromText(addr, extra){
+  var hay=" "+((addr||"")+" "+(extra||"")).toLowerCase().replace(/[^a-z\s]/g," ").replace(/\s+/g," ")+" ";
+  var best="", bl=0;
+  for(var i=0;i<CITIES.length;i++){
+    var c=CITIES[i].toLowerCase();
+    if(hay.indexOf(" "+c+" ")>-1 && c.length>bl){ best=CITIES[i]; bl=c.length; }
+  }
+  if(best) return best;
+  var skip=/^(east|west|north|south|road|rd|nagar|colony|near|opp|dist|district|state|india|bharat|pin|po|ps|tal|taluka|village|city|town|gali|lane|sector|block|floor|flat|house|plot|mob|no)$/i;
+  var w=String(addr||"").replace(/,/g," ").split(/\s+/).filter(function(x){ return /^[A-Za-z]{3,}$/.test(x); });
+  while(w.length && skip.test(w[w.length-1])) w.pop();
+  return w.length ? w[w.length-1] : "";
+}
+
+var RE_PIN=/^\d{6}$/,
+    RE_PHONE=/^(?:\+?91[\s-]?)?[6-9]\d{9}$/,
+    RE_MAIL=/[\w.+-]+@[\w-]+\.[\w.]+/,
+    RE_PAY=/\b(cod|c\.o\.d|cash on delivery|prepaid|pre paid|ppd|paid|online|upi)\b/i,
+    RE_QTY=/^(\d{1,4})\s*(pcs?|pieces?|pc|nos?|qty|units?|quantity|adad|piece)\b/i,
+    RE_SKIP=/^\d+\s*(rec|recs|reel|reels|rec\.)\s*$/i,
+    RE_ATTR=/\b(colou?r|size|model|variant|shade|type|design)\b\s*[:;\-=]/i,
+    RE_NUM=/(\d+(?:\.\d+)?)/;
+
+function parseOne(raw){
+  var lines=raw.split(/\r?\n/).map(function(s){return s.trim();}).filter(function(s){return s.length>0;});
+  if(!lines.length) return null;
+
+  var pin="",phone="",email="",pay="",amount="",qty="",nameLines=[],prodLines=[];
+  var kind=new Array(lines.length).fill(""), lastContact=-1;
+
+  for(var i=0;i<lines.length;i++){
+    var L=lines[i], bare=L.replace(/[^\d+]/g,"");
+    if(RE_PIN.test(L)||(/^\d{6}$/.test(bare)&&!/[a-z]{4,}/i.test(L))){
+      if(!pin){ pin=bare.slice(-6); kind[i]="pin"; lastContact=Math.max(lastContact,i); continue; }
+    }
+    if(RE_PHONE.test(L.replace(/[\s-]/g,""))){
+      if(!phone){ var dg=bare.replace(/\D/g,""); phone=dg.length>10?dg.slice(-10):dg;
+        kind[i]="phone"; lastContact=Math.max(lastContact,i); continue; }
+    }
+    if(RE_MAIL.test(L)&&L.split(/\s+/).length<=2){
+      email=L.match(RE_MAIL)[0]; kind[i]="mail"; lastContact=Math.max(lastContact,i); continue;
+    }
+    if(RE_PAY.test(L)){
+      var m=L.match(RE_PAY)[1].toLowerCase();
+      pay=(m.indexOf("cod")===0||m.indexOf("c.o")===0||m.indexOf("cash")===0)?"COD":"Prepaid";
+      var n=L.match(RE_NUM); if(n) amount=n[1];
+      kind[i]="pay"; continue;
+    }
+    if(RE_SKIP.test(L)){ kind[i]="skip"; continue; }
+    if(RE_QTY.test(L)){ qty=L.match(RE_QTY)[1]; kind[i]="qty"; continue; }
+  }
+
+  for(var j=0;j<lines.length;j++){
+    if(kind[j]) continue;
+    if(/^\d+(\.\d+)?$/.test(lines[j]) && j>lastContact){
+      if(!amount){ amount=lines[j]; kind[j]="pay"; continue; }
+      if(!qty){ qty=lines[j]; kind[j]="qty"; continue; }
+    }
+    if(j<=lastContact || (lastContact===-1 && j<2)) nameLines.push(lines[j]);
+    else prodLines.push(lines[j]);
+  }
+
+  var name=nameLines.length?nameLines[0]:"";
+  var addr=nameLines.slice(1).join(", ");
+  if(!name&&prodLines.length) name=prodLines.shift();
+
+  var seen={}, prod=[];
+  prodLines.map(function(p){
+    return RE_ATTR.test(p)?p.replace(/\s*[:;\-=]+\s*/," ").replace(/\s+/g," "):p;
+  }).forEach(function(p){ var k=p.toLowerCase(); if(!seen[k]){ seen[k]=1; prod.push(p); } });
+
+  var q=parseFloat(qty)||1, amt=parseFloat(amount)||0, unit, collect;
+  if(S.priceMode==="unit"){ unit=amt; collect=+(amt*q).toFixed(2); }
+  else { collect=amt; unit=q?+(amt/q).toFixed(2):amt; }
+  if(!pay) pay="COD";
+
+  var r=new Array(N).fill("");
+  SETTING_FIELDS.forEach(function(f){ r[f.c]=S["c"+f.c]||""; });
+  r[C.orderId]="";
+  r[C.date]=today();
+  r[C.pay]=pay;
+  r[C.name]=name;
+  r[C.email]=email;
+  r[C.phone]=phone;
+  r[C.addr]=addr;
+  r[C.pin]=pin;
+  r[C.state]=stateFromPin(pin);
+  r[C.city]=cityFromText(addr,name);
+  r[C.partial]="No";
+  r[C.collect]=pay==="COD"?String(collect):"0";
+  r[C.prod1]=prod.join(" - ");
+  r[C.qty1]=String(q);
+  r[C.price1]=String(unit);
+  r[C.disc1]="0";
+  if(S.copyBilling==="yes") copyBilling(r);
+  return r;
+}
+
+function copyBilling(r){
+  r[C.bName]=r[C.name]; r[C.bEmail]=r[C.email]; r[C.bPhone]=r[C.phone];
+  r[C.bAddr]=r[C.addr]; r[C.bLandmark]=r[C.landmark];
+  r[C.bState]=r[C.state]; r[C.bCity]=r[C.city]; r[C.bPin]=r[C.pin];
+}
+
+function recalc(r){
+  var q=parseFloat(r[C.qty1])||0, u=parseFloat(r[C.price1])||0;
+  var q2=parseFloat(r[C.qty2])||0, u2=parseFloat(r[C.price2])||0;
+  var total=q*u+q2*u2;
+  r[C.collect] = r[C.pay]==="COD" ? String(+total.toFixed(2)) : "0";
+}
+
+function badCols(r){
+  var b=[];
+  REQUIRED.forEach(function(c){ if(!String(r[c]||"").trim()) b.push(c); });
+  if(r[C.pin] && !/^\d{6}$/.test(r[C.pin]) && b.indexOf(C.pin)<0) b.push(C.pin);
+  if(r[C.phone] && !/^\d{10}$/.test(r[C.phone]) && b.indexOf(C.phone)<0) b.push(C.phone);
+  if(!(parseFloat(r[C.qty1])>0) && b.indexOf(C.qty1)<0) b.push(C.qty1);
+  return b;
+}
+
+function stateOptions(sel){
+  var out='<option value=""></option>';
+  STATES.forEach(function(s){ out+='<option value="'+esc(s)+'"'+(s===sel?' selected':'')+'>'+esc(s)+'</option>'; });
+  return out;
+}
+
+function render(){
+  el("qcount").textContent=orders.length;
+  var host=el("tableHost");
+  if(!orders.length){
+    host.innerHTML='<div class="empty"><b>Nothing in the queue yet</b>Paste a message on the left and press Parse and add.</div>';
+    el("flagErr").className="flags err";
+    return;
+  }
+  var head=["","Name","Mobile","Address","Pincode","City","State","Product","Qty","Unit price","Payment","Collect","Wt","L","B","H",""];
+  var rows=orders.map(function(r,i){
+    var bad=badCols(r);
+    function k(c){ return bad.indexOf(c)>-1?" bad":""; }
+    function inp(c,cls,mode){
+      return '<input class="'+(cls||"")+k(c)+'" data-i="'+i+'" data-c="'+c+'"'+
+             (mode?' inputmode="'+mode+'"':'')+' value="'+esc(r[c])+'">';
+    }
+    return '<tr>'+
+      '<td><button class="rowbtn" data-open="'+i+'">All fields</button></td>'+
+      '<td>'+inp(C.name,"w-name")+'</td>'+
+      '<td>'+inp(C.phone,"code w-sm","numeric")+'</td>'+
+      '<td>'+inp(C.addr,"w-addr")+'</td>'+
+      '<td>'+inp(C.pin,"code w-xs","numeric")+'</td>'+
+      '<td>'+inp(C.city,"w-city")+'</td>'+
+      '<td><select class="w-state'+k(C.state)+'" data-i="'+i+'" data-c="'+C.state+'">'+stateOptions(r[C.state])+'</select></td>'+
+      '<td>'+inp(C.prod1,"w-prod")+'</td>'+
+      '<td>'+inp(C.qty1,"num w-xs","decimal")+'</td>'+
+      '<td>'+inp(C.price1,"num w-sm","decimal")+'</td>'+
+      '<td><select class="w-xs" data-i="'+i+'" data-c="'+C.pay+'">'+
+        '<option value="COD"'+(r[C.pay]==="COD"?" selected":"")+'>COD</option>'+
+        '<option value="Prepaid"'+(r[C.pay]==="Prepaid"?" selected":"")+'>Prepaid</option></select></td>'+
+      '<td>'+inp(C.collect,"num w-sm","decimal")+'</td>'+
+      '<td>'+inp(C.weight,"num w-xs","decimal")+'</td>'+
+      '<td>'+inp(C.len,"num w-xs","decimal")+'</td>'+
+      '<td>'+inp(C.bre,"num w-xs","decimal")+'</td>'+
+      '<td>'+inp(C.hei,"num w-xs","decimal")+'</td>'+
+      '<td><button class="del" data-del="'+i+'" aria-label="Remove row" title="Remove row">&times;</button></td>'+
+    '</tr>';
+  }).join("");
+
+  host.innerHTML='<div class="tablewrap"><table><thead><tr>'+
+    head.map(function(h){ return '<th>'+h+'</th>'; }).join("")+
+    '</tr></thead><tbody>'+rows+'</tbody></table></div>';
+
+  var missing=0;
+  orders.forEach(function(r){ if(badCols(r).length) missing++; });
+  var fe=el("flagErr");
+  if(missing){
+    fe.textContent=missing+(missing===1?" row is":" rows are")+" missing a required column. Red boxes show it here; open All fields for the rest.";
+    fe.className="flags err show";
+  } else fe.className="flags err";
+}
+
+function fieldControl(r,c,idx){
+  var lbl=HEADERS[c], req=/\*$/.test(lbl);
+  var clean=lbl.replace(/\*$/,"");
+  var bad=badCols(r).indexOf(c)>-1?" bad":"";
+  var ctrl;
+  if(c===C.state||c===C.bState){
+    ctrl='<select data-d="'+c+'" class="'+bad.trim()+'">'+stateOptions(r[c])+'</select>';
+  } else if(c===C.pay){
+    ctrl='<select data-d="'+c+'"><option value="COD"'+(r[c]==="COD"?" selected":"")+'>COD</option>'+
+         '<option value="Prepaid"'+(r[c]==="Prepaid"?" selected":"")+'>Prepaid</option></select>';
+  } else if(YESNO.indexOf(c)>-1){
+    ctrl='<select data-d="'+c+'"><option value="No"'+(r[c]!=="Yes"?" selected":"")+'>No</option>'+
+         '<option value="Yes"'+(r[c]==="Yes"?" selected":"")+'>Yes</option></select>';
+  } else {
+    var mode=NUMERIC.indexOf(c)>-1?' inputmode="decimal"':'';
+    ctrl='<input data-d="'+c+'" class="'+bad.trim()+'"'+mode+' value="'+esc(r[c])+'">';
+  }
+  return '<div'+(WIDE.indexOf(c)>-1?' class="full"':'')+'>'+
+    '<label for="">'+esc(clean)+(req?' <span class="req">*</span>':'')+'</label>'+ctrl+'</div>';
+}
+
+function openDrawer(i){
+  if(i<0||i>=orders.length) return;
+  openIdx=i;
+  var r=orders[i];
+  el("dtitle").textContent="All fields — row "+(i+1)+" of "+orders.length;
+  el("dBody").innerHTML=GROUPS.map(function(g){
+    return '<div class="dgroup"><h3>'+esc(g.t)+'</h3>'+
+      (g.copy?'<p class="smallnote">'+(S.copyBilling==="yes"
+        ? 'These follow the shipping details automatically. Edit any of them to override just this row.'
+        : '<button class="rowbtn" id="copyBill">Copy shipping details into billing</button>')+'</p>':'')+
+      '<div class="dfields">'+g.f.map(function(c){ return fieldControl(r,c,i); }).join("")+'</div></div>';
+  }).join("")+'<p class="smallnote">Blank columns stay blank in the CSV. Order ID is optional on this sheet.</p>';
+
+  var cb=el("copyBill");
+  if(cb) cb.addEventListener("click", function(){
+    copyBilling(orders[openIdx]); save(K_O,orders); openDrawer(openIdx); toast("Billing filled from shipping");
+  });
+
+  el("drawer").classList.add("show");
+  el("drawer").setAttribute("aria-hidden","false");
+  el("scrim").classList.add("show");
+}
+function closeDrawer(){
+  openIdx=-1;
+  el("drawer").classList.remove("show");
+  el("drawer").setAttribute("aria-hidden","true");
+  el("scrim").classList.remove("show");
+  render();
+}
+
+el("dBody").addEventListener("input", function(e){
+  var c=e.target.getAttribute("data-d");
+  if(c===null||openIdx<0) return;
+  c=+c;
+  var r=orders[openIdx];
+  r[c]=e.target.value;
+  if(c===C.pin && /^\d{6}$/.test(r[c])){
+    var st=stateFromPin(r[c]);
+    if(st){ r[C.state]=st; var ss=el("dBody").querySelector('[data-d="'+C.state+'"]'); if(ss) ss.value=st; }
+  }
+  if(S.copyBilling==="yes" && MIRROR[c]!==undefined){
+    r[MIRROR[c]]=r[c];
+    var mv=el("dBody").querySelector('[data-d="'+MIRROR[c]+'"]');
+    if(mv) mv.value=r[MIRROR[c]];
+    if(c===C.pin){
+      r[C.bState]=r[C.state];
+      var bs=el("dBody").querySelector('[data-d="'+C.bState+'"]');
+      if(bs) bs.value=r[C.bState];
+    }
+  }
+  if(c===C.qty1||c===C.price1||c===C.qty2||c===C.price2||c===C.pay){
+    recalc(r);
+    var cc=el("dBody").querySelector('[data-d="'+C.collect+'"]');
+    if(cc) cc.value=r[C.collect];
+  }
+  e.target.classList.toggle("bad", badCols(r).indexOf(c)>-1);
+  save(K_O,orders);
+});
+
+el("dClose").addEventListener("click", closeDrawer);
+el("scrim").addEventListener("click", closeDrawer);
+el("dPrev").addEventListener("click", function(){ if(openIdx>0) openDrawer(openIdx-1); });
+el("dNext").addEventListener("click", function(){ if(openIdx<orders.length-1) openDrawer(openIdx+1); });
+document.addEventListener("keydown", function(e){ if(e.key==="Escape"&&openIdx>-1) closeDrawer(); });
+
+el("tableHost").addEventListener("input", function(e){
+  var t=e.target, i=t.getAttribute("data-i"), c=t.getAttribute("data-c");
+  if(i===null||c===null) return;
+  i=+i; c=+c;
+  var r=orders[i];
+  r[c]=t.value;
+  if(c===C.pin && /^\d{6}$/.test(t.value)){
+    var st=stateFromPin(t.value);
+    if(st){ r[C.state]=st; var ss=el("tableHost").querySelector('select[data-i="'+i+'"][data-c="'+C.state+'"]'); if(ss) ss.value=st; }
+  }
+  if(S.copyBilling==="yes"){
+    if(MIRROR[c]!==undefined) r[MIRROR[c]]=r[c];
+    if(c===C.pin) r[C.bState]=r[C.state];
+  }
+  if(c===C.qty1||c===C.price1||c===C.pay){
+    recalc(r);
+    var cc=el("tableHost").querySelector('input[data-i="'+i+'"][data-c="'+C.collect+'"]');
+    if(cc) cc.value=r[C.collect];
+  }
+  t.classList.toggle("bad", badCols(r).indexOf(c)>-1);
+  save(K_O,orders);
+});
+el("tableHost").addEventListener("change", function(e){
+  if(e.target.tagName==="SELECT"){ save(K_O,orders); render(); }
+});
+el("tableHost").addEventListener("click", function(e){
+  var o=e.target.getAttribute("data-open");
+  if(o!==null){ openDrawer(+o); return; }
+  var d=e.target.getAttribute("data-del");
+  if(d!==null){ orders.splice(+d,1); save(K_O,orders); render(); }
+});
+
+function cell(v){
+  var s=String(v==null?"":v);
+  return /[",\r\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+}
+function buildCsv(){
+  var out=[HEADERS.map(cell).join(",")];
+  orders.forEach(function(r){
+    var a=new Array(N).fill("");
+    for(var i=0;i<N;i++) a[i]=r[i]==null?"":r[i];
+    out.push(a.map(cell).join(","));
+  });
+  return out.join("\r\n")+"\r\n";
+}
+
+el("csvBtn").addEventListener("click", function(){
+  if(!orders.length){ toast("Queue is empty"); return; }
+  var blob=new Blob([buildCsv()],{type:"text/csv"});
+  var url=URL.createObjectURL(blob), a=document.createElement("a");
+  var d=new Date(), p=function(n){return (n<10?"0":"")+n;};
+  a.href=url;
+  a.download="bulk_orders_"+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+"_"+orders.length+".csv";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(url); },1500);
+  toast("CSV downloaded");
+});
+
+el("copyBtn").addEventListener("click", function(){
+  if(!orders.length){ toast("Queue is empty"); return; }
+  var txt=buildCsv();
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(function(){ toast("CSV copied"); },function(){ toast("Copy blocked by the browser"); });
+  } else {
+    var ta=document.createElement("textarea"); ta.value=txt;
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand("copy"); toast("CSV copied"); }catch(e){ toast("Copy blocked by the browser"); }
+    ta.remove();
+  }
+});
+
+el("addBtn").addEventListener("click", function(){
+  var raw=el("paste").value;
+  if(!raw.trim()){ toast("Paste a message first"); return; }
+  var blocks=raw.split(/^[ \t]*[-_=*]{3,}[ \t]*$/m).map(function(b){return b.trim();}).filter(Boolean);
+  var added=0;
+  blocks.forEach(function(b){ var r=parseOne(b); if(r){ orders.push(r); added++; } });
+  save(K_O,orders); render();
+  el("paste").value=""; el("paste").focus();
+  toast(added===1?"1 order added":added+" orders added");
+});
+
+el("clearPaste").addEventListener("click", function(){ el("paste").value=""; el("paste").focus(); });
+
+el("clearAll").addEventListener("click", function(){
+  if(!orders.length) return;
+  if(confirm("Remove all "+orders.length+" rows from the queue?")){
+    orders=[]; save(K_O,orders); render(); toast("Queue cleared");
+  }
+});
+
+el("sampleBtn").addEventListener("click", function(){
+  el("paste").value=
+"Vansh sable\nKawtha Kamthi Nagpur forno tech kampani\n441002\n9834551458\n\nIphone 16 converter\n\nColour ;- orange\nIphone converter\n\n30 rec\n799 COD\n\n---\n\nPriya Mehta\n42 MG Road Apt 3B, Near City Mall, Bengaluru\n560001\n9876543210\n\nCotton Kurta\nColour ;- red\nSize ;- M\n\n2 pcs\n999 Prepaid";
+  el("paste").focus();
+});
+
+el("paste").addEventListener("keydown", function(e){
+  if((e.ctrlKey||e.metaKey)&&e.key==="Enter"){ e.preventDefault(); el("addBtn").click(); }
+});
+
+(function buildSettings(){
+  var host=el("setGrid"), html="";
+  SETTING_FIELDS.forEach(function(f){
+    var v=S["c"+f.c]||"";
+    var ctrl = f.yesno
+      ? '<select data-s="c'+f.c+'"><option value="No"'+(v!=="Yes"?" selected":"")+'>No</option><option value="Yes"'+(v==="Yes"?" selected":"")+'>Yes</option></select>'
+      : '<input data-s="c'+f.c+'" value="'+esc(v)+'">';
+    html+='<div'+(f.full?' class="full"':'')+'><label>'+esc(f.label)+'</label>'+ctrl+'</div>';
+  });
+  html+='<div class="full"><label>The cost in the message is</label>'+
+    '<select data-s="priceMode">'+
+    '<option value="unit"'+(S.priceMode==="unit"?" selected":"")+'>The cost of one piece</option>'+
+    '<option value="total"'+(S.priceMode==="total"?" selected":"")+'>The total for the whole order</option>'+
+    '</select></div>';
+  html+='<div class="full"><label>Billing columns</label>'+
+    '<select data-s="copyBilling">'+
+    '<option value="yes"'+(S.copyBilling==="yes"?" selected":"")+'>Keep the same as shipping</option>'+
+    '<option value="no"'+(S.copyBilling==="no"?" selected":"")+'>Leave blank</option>'+
+    '</select></div>';
+  host.innerHTML=html;
+  host.addEventListener("input", function(e){
+    var k=e.target.getAttribute("data-s");
+    if(!k) return;
+    S[k]=e.target.value; save(K_S,S);
+    if(k==="copyBilling" && S.copyBilling==="yes" && orders.length){
+      orders.forEach(copyBilling); save(K_O,orders);
+      if(openIdx>-1) openDrawer(openIdx);
+      toast("Billing columns matched to shipping");
+    }
+  });
+})();
+
+render();
+})();
+</script>
+</body>
+</html>
