@@ -139,21 +139,20 @@ input.bad,select.bad{background:var(--red-bg);border-color:var(--red)}
 
 <main>
   <section class="pane-left">
-    <label class="field" for="paste">Paste the message here. Separate multiple orders with a line of three dashes.</label>
-    <textarea id="paste" spellcheck="false" placeholder="Vansh sable
-Kawtha Kamthi Nagpur forno tech kampani
-441002
-9834551458
-
-Iphone 16 converter
-
-Colour ;- orange
-
-30 rec
-799 COD"></textarea>
+    <label class="field" for="paste">Paste the message here, labelled or raw. Separate multiple orders with a line of three dashes.</label>
+    <textarea id="paste" spellcheck="false" placeholder="Name - Vansh sable
+Product - Iphone 16 converter
+Colour - orange
+Address - Kawtha Kamthi Nagpur forno tech kampani
+Pincode - 441002
+Mobile - 9834551458
+Qty - 1
+Price - 799
+Payment - COD"></textarea>
     <div class="row-actions">
       <button class="primary" id="addBtn">Parse and add</button>
       <button class="ghost" id="clearPaste">Clear box</button>
+      <button class="ghost" id="tmplBtn">Insert template</button>
       <button class="ghost" id="sampleBtn">Load example</button>
     </div>
 
@@ -163,11 +162,15 @@ Colour ;- orange
     </details>
 
     <p class="hint">
-      Lines are picked out by shape, not by position: a 6-digit line is the pincode, a 10-digit line is the mobile,
-      a line with <code>COD</code> or <code>Prepaid</code> is the payment and the cost.
-      Everything before the pincode becomes name and address, everything after becomes the product.
-      City comes from the address text, state from the pincode. Lines like <code>30 rec</code> are ignored.
-      Order ID is left blank. Use <b>All fields</b> on any row to fill the other sheet columns.
+      Two ways to write an order, and both work in the same box.
+      <b>Labelled</b> is exact: start a line with <code>Name -</code>, <code>Product -</code>, <code>Address -</code>,
+      <code>Pincode -</code>, <code>Mobile -</code>, <code>Colour -</code>, <code>Qty -</code>, <code>Price -</code>,
+      <code>Payment -</code>. Leave a label blank and the next lines below it belong to that label.
+      <b>Raw</b> needs no labels: a 6-digit line is the pincode, a 10-digit line is the mobile, a line with
+      <code>COD</code> or <code>Prepaid</code> is the payment and cost, lines before the pincode are name and address,
+      lines after are the product. In both styles, <code>23 L</code> / <code>13 B</code> / <code>6 H</code> and
+      <code>0.5 kg</code> override the default size, lines like <code>30 rec</code> are ignored, state comes from the
+      pincode, and Order ID stays blank. Use <b>All fields</b> on a row for the rest of the sheet columns.
     </p>
   </section>
 
@@ -285,9 +288,9 @@ var SETTING_FIELDS = [
   {c:C.reseller,label:"Reseller name",       def:""},
   {c:C.gstin,   label:"Buyer's GSTIN",       def:""},
   {c:C.weight,  label:"Weight (kg)",         def:"0.5"},
-  {c:C.len,     label:"Length (cm)",         def:"20"},
-  {c:C.bre,     label:"Breadth (cm)",        def:"15"},
-  {c:C.hei,     label:"Height (cm)",         def:"10"},
+  {c:C.len,     label:"Length (cm)",         def:"23"},
+  {c:C.bre,     label:"Breadth (cm)",        def:"13"},
+  {c:C.hei,     label:"Height (cm)",         def:"6"},
   {c:C.shipChg, label:"Shipping charges",    def:"0"},
   {c:C.codChg,  label:"COD charges",         def:"0"},
   {c:C.discount,label:"Total discount",      def:"0"},
@@ -316,8 +319,12 @@ function toast(m){ var t=el("toast"); t.textContent=m; t.classList.add("show");
 
 (function initSettings(){
   var saved=load(K_S,{})||{};
+  if(saved["c"+C.len]==="20" && saved["c"+C.bre]==="15" && saved["c"+C.hei]==="10"){
+    saved["c"+C.len]="23"; saved["c"+C.bre]="13"; saved["c"+C.hei]="6";
+  }
   SETTING_FIELDS.forEach(function(f){ S["c"+f.c] = saved["c"+f.c]!==undefined ? saved["c"+f.c] : f.def; });
   Object.keys(EXTRA).forEach(function(k){ S[k] = saved[k]!==undefined ? saved[k] : EXTRA[k]; });
+  save(K_S,S);
 })();
 orders = load(K_O,[])||[];
 orders = orders.filter(function(r){ return Array.isArray(r); }).map(function(r){
@@ -348,7 +355,9 @@ function cityFromText(addr, extra){
   var skip=/^(east|west|north|south|road|rd|nagar|colony|near|opp|dist|district|state|india|bharat|pin|po|ps|tal|taluka|village|city|town|gali|lane|sector|block|floor|flat|house|plot|mob|no)$/i;
   var w=String(addr||"").replace(/,/g," ").split(/\s+/).filter(function(x){ return /^[A-Za-z]{3,}$/.test(x); });
   while(w.length && skip.test(w[w.length-1])) w.pop();
-  return w.length ? w[w.length-1] : "";
+  if(!w.length) return "";
+  var last=w[w.length-1];
+  return last.charAt(0).toUpperCase()+last.slice(1).toLowerCase();
 }
 
 var RE_PIN=/^\d{6}$/,
@@ -357,15 +366,102 @@ var RE_PIN=/^\d{6}$/,
     RE_PAY=/\b(cod|c\.o\.d|cash on delivery|prepaid|pre paid|ppd|paid|online|upi)\b/i,
     RE_QTY=/^(\d{1,4})\s*(pcs?|pieces?|pc|nos?|qty|units?|quantity|adad|piece)\b/i,
     RE_SKIP=/^\d+\s*(rec|recs|reel|reels|rec\.)\s*$/i,
+    RE_DIM_A=/^(\d+(?:\.\d+)?)\s*[.,:\-)]?\s*(l|b|w|h|lenght|length|breadth|width|height|ht)\s*(cm|cms|inch|in)?\s*$/i,
+    RE_DIM_B=/^(l|b|w|h|lenght|length|breadth|width|height|ht)\s*[.,:=\-]?\s*(\d+(?:\.\d+)?)\s*(cm|cms|inch|in)?\s*$/i,
+    RE_WT=/^(\d+(?:\.\d+)?)\s*(kgs?|kilo(?:gram)?s?|gms?|grams?|g)\s*$/i,
     RE_ATTR=/\b(colou?r|size|model|variant|shade|type|design)\b\s*[:;\-=]/i,
     RE_NUM=/(\d+(?:\.\d+)?)/;
 
-function parseOne(raw){
-  var lines=raw.split(/\r?\n/).map(function(s){return s.trim();}).filter(function(s){return s.length>0;});
-  if(!lines.length) return null;
+var LABELS=[
+  {k:"name",    re:/^(name|customer|cust|buyer|client|naam|to)$/i},
+  {k:"address", re:/^(address|addr|add|adress|full address|shipping address|delivery address|pata)$/i},
+  {k:"landmark",re:/^(landmark|land mark|near|nearby)$/i},
+  {k:"pin",     re:/^(pin|pincode|pin code|pincod|postal code|post code|zip)$/i},
+  {k:"phone",   re:/^(mobile|mob|mobile no|mobile number|phone|phone no|contact|contact no|number|no|whatsapp|wa)$/i},
+  {k:"email",   re:/^(email|e mail|e-mail|mail)$/i},
+  {k:"city",    re:/^(city|town)$/i},
+  {k:"state",   re:/^(state)$/i},
+  {k:"product", re:/^(product|products|item|items|product name|goods|order)$/i},
+  {k:"colour",  re:/^(colou?r|shade)$/i},
+  {k:"size",    re:/^(size|variant|model|design)$/i},
+  {k:"qty",     re:/^(qty|quantity|pcs|pieces|nos|units)$/i},
+  {k:"price",   re:/^(price|amount|cost|rate|value|mrp|total|rs)$/i},
+  {k:"payment", re:/^(payment|payment mode|payment method|mode|pay|type)$/i},
+  {k:"weight",  re:/^(weight|wt)$/i},
+  {k:"length",  re:/^(length|len|lenght|l)$/i},
+  {k:"breadth", re:/^(breadth|width|bredth|b|w)$/i},
+  {k:"height",  re:/^(height|ht|h)$/i},
+  {k:"sku",     re:/^(sku|sku code|code)$/i},
+  {k:"hsn",     re:/^(hsn|hsn code)$/i},
+  {k:"gstin",   re:/^(gst|gstin|gst no)$/i}
+];
+var RE_LABEL=/^\s*([A-Za-z][A-Za-z .\/]{0,24}?)\s*[;:=]*\s*[-\u2013\u2014:]\s*(.*)$/;
+var JOIN={ address:", ", landmark:", ", product:" - " };
 
+function labelOf(word){
+  var w=word.replace(/[.\/]+$/,"").replace(/\s+/g," ").trim();
+  for(var i=0;i<LABELS.length;i++) if(LABELS[i].re.test(w)) return LABELS[i].k;
+  return "";
+}
+
+function parseLabelled(lines){
+  var d={}, hits=0, last="";
+  for(var i=0;i<lines.length;i++){
+    var m=lines[i].match(RE_LABEL), k="";
+    if(m) k=labelOf(m[1]);
+    if(k){
+      hits++;
+      last=k;
+      var v=m[2].trim();
+      if(v) d[k]=d[k]?d[k]+(JOIN[k]||" ")+v:v;
+      else if(d[k]===undefined) d[k]="";
+    } else if(last){
+      var v2=lines[i].trim();
+      if(v2) d[last]=d[last]?d[last]+(JOIN[last]||" ")+v2:v2;
+    }
+  }
+  if(hits<2) return null;
+  if(!d.name && !d.address && !d.product) return null;
+  return d;
+}
+
+function shapeFallback(d, lines){
+  var all=lines.join("\n");
+  if(!d.pin){
+    var pm=all.match(/\b(\d{6})\b/);
+    if(pm) d.pin=pm[1];
+  }
+  if(!d.phone){
+    var hm=all.replace(/[\s-]/g,"").match(/\b((?:\+?91)?[6-9]\d{9})\b/);
+    if(hm) d.phone=hm[1];
+  }
+  if(!d.email){
+    var em=all.match(RE_MAIL);
+    if(em) d.email=em[0];
+  }
+  if(!d.payment){
+    var ym=all.match(RE_PAY);
+    if(ym) d.payment=ym[1];
+  }
+  if(!d.price){
+    var src=(d.payment&&all.match(RE_PAY))?all.split(/\r?\n/).filter(function(l){return RE_PAY.test(l);})[0]:"";
+    var nm=src?src.match(RE_NUM):null;
+    if(nm) d.price=nm[1];
+  }
+  return d;
+}
+
+function parseShape(lines){
+  var d={}, dims={}, wt="";
   var pin="",phone="",email="",pay="",amount="",qty="",nameLines=[],prodLines=[];
   var kind=new Array(lines.length).fill(""), lastContact=-1;
+
+  function setDim(letter,val){
+    var k=letter.toLowerCase().charAt(0);
+    if(k==="l") dims.length=val;
+    else if(k==="b"||k==="w") dims.breadth=val;
+    else if(k==="h") dims.height=val;
+  }
 
   for(var i=0;i<lines.length;i++){
     var L=lines[i], bare=L.replace(/[^\d+]/g,"");
@@ -380,12 +476,18 @@ function parseOne(raw){
       email=L.match(RE_MAIL)[0]; kind[i]="mail"; lastContact=Math.max(lastContact,i); continue;
     }
     if(RE_PAY.test(L)){
-      var m=L.match(RE_PAY)[1].toLowerCase();
-      pay=(m.indexOf("cod")===0||m.indexOf("c.o")===0||m.indexOf("cash")===0)?"COD":"Prepaid";
+      pay=L.match(RE_PAY)[1];
       var n=L.match(RE_NUM); if(n) amount=n[1];
       kind[i]="pay"; continue;
     }
     if(RE_SKIP.test(L)){ kind[i]="skip"; continue; }
+    var dm=L.match(RE_DIM_A);
+    if(dm){ setDim(dm[2],dm[1]); kind[i]="dim"; continue; }
+    dm=L.match(RE_DIM_B);
+    if(dm){ setDim(dm[1],dm[2]); kind[i]="dim"; continue; }
+    var wm=L.match(RE_WT);
+    if(wm){ var val=parseFloat(wm[1]); if(/^g/i.test(wm[2])) val=val/1000;
+      wt=String(+val.toFixed(3)); kind[i]="wt"; continue; }
     if(RE_QTY.test(L)){ qty=L.match(RE_QTY)[1]; kind[i]="qty"; continue; }
   }
 
@@ -408,10 +510,39 @@ function parseOne(raw){
     return RE_ATTR.test(p)?p.replace(/\s*[:;\-=]+\s*/," ").replace(/\s+/g," "):p;
   }).forEach(function(p){ var k=p.toLowerCase(); if(!seen[k]){ seen[k]=1; prod.push(p); } });
 
-  var q=parseFloat(qty)||1, amt=parseFloat(amount)||0, unit, collect;
+  d.name=name; d.address=addr; d.pin=pin; d.phone=phone; d.email=email;
+  d.payment=pay; d.price=amount; d.qty=qty; d.product=prod.join(" - ");
+  d.weight=wt; d.length=dims.length; d.breadth=dims.breadth; d.height=dims.height;
+  return d;
+}
+
+function num(v){ var m=String(v==null?"":v).match(RE_NUM); return m?m[1]:""; }
+
+function buildRow(d){
+  var name=(d.name||"").trim();
+  var addr=(d.address||"").trim();
+  var pin=(num(d.pin)||"").slice(0,6);
+  var phoneDigits=String(d.phone||"").replace(/\D/g,"");
+  var phone=phoneDigits.length>10?phoneDigits.slice(-10):phoneDigits;
+
+  var prod=[];
+  if(d.product) prod.push(String(d.product).trim());
+  if(d.colour) prod.push("Colour "+String(d.colour).trim());
+  if(d.size) prod.push("Size "+String(d.size).trim());
+
+  var pay=/prepaid|pre paid|ppd|paid|online|upi/i.test(String(d.payment||"")) ? "Prepaid" : "COD";
+  var q=parseFloat(num(d.qty))||1;
+  var amt=parseFloat(num(d.price))||0;
+  var unit, collect;
   if(S.priceMode==="unit"){ unit=amt; collect=+(amt*q).toFixed(2); }
   else { collect=amt; unit=q?+(amt/q).toFixed(2):amt; }
-  if(!pay) pay="COD";
+
+  var st="";
+  if(d.state){
+    var want=String(d.state).trim().toLowerCase();
+    for(var i=0;i<STATES.length;i++) if(STATES[i].toLowerCase()===want) st=STATES[i];
+  }
+  if(!st) st=stateFromPin(pin);
 
   var r=new Array(N).fill("");
   SETTING_FIELDS.forEach(function(f){ r[f.c]=S["c"+f.c]||""; });
@@ -419,13 +550,21 @@ function parseOne(raw){
   r[C.date]=today();
   r[C.pay]=pay;
   r[C.name]=name;
-  r[C.email]=email;
+  r[C.email]=(d.email||"").trim();
   r[C.phone]=phone;
   r[C.addr]=addr;
+  r[C.landmark]=(d.landmark||"").trim();
   r[C.pin]=pin;
-  r[C.state]=stateFromPin(pin);
-  r[C.city]=cityFromText(addr,name);
+  r[C.state]=st;
+  r[C.city]=(d.city||"").trim()||cityFromText(addr,name);
   r[C.partial]="No";
+  if(num(d.weight)) r[C.weight]=num(d.weight);
+  if(num(d.length)) r[C.len]=num(d.length);
+  if(num(d.breadth)) r[C.bre]=num(d.breadth);
+  if(num(d.height)) r[C.hei]=num(d.height);
+  if(d.sku) r[C.sku1]=String(d.sku).trim();
+  if(num(d.hsn)) r[C.hsn1]=num(d.hsn);
+  if(d.gstin) r[C.gstin]=String(d.gstin).trim();
   r[C.collect]=pay==="COD"?String(collect):"0";
   r[C.prod1]=prod.join(" - ");
   r[C.qty1]=String(q);
@@ -433,6 +572,15 @@ function parseOne(raw){
   r[C.disc1]="0";
   if(S.copyBilling==="yes") copyBilling(r);
   return r;
+}
+
+function parseOne(raw){
+  var lines=raw.split(/\r?\n/).map(function(s){return s.trim();}).filter(function(s){return s.length>0;});
+  if(!lines.length) return null;
+  var d=parseLabelled(lines);
+  if(d) d=shapeFallback(d,lines);
+  else d=parseShape(lines);
+  return buildRow(d);
 }
 
 function copyBilling(r){
@@ -692,9 +840,17 @@ el("clearAll").addEventListener("click", function(){
   }
 });
 
+el("tmplBtn").addEventListener("click", function(){
+  var t="Name - \nProduct - \nColour - \nAddress - \nPincode - \nMobile - \nQty - 1\nPrice - \nPayment - COD";
+  var box=el("paste");
+  box.value = box.value.trim() ? box.value.replace(/\s*$/,"")+"\n\n---\n\n"+t : t;
+  box.focus();
+  box.setSelectionRange(box.value.indexOf("Name - ")+7, box.value.indexOf("Name - ")+7);
+});
+
 el("sampleBtn").addEventListener("click", function(){
   el("paste").value=
-"Vansh sable\nKawtha Kamthi Nagpur forno tech kampani\n441002\n9834551458\n\nIphone 16 converter\n\nColour ;- orange\nIphone converter\n\n30 rec\n799 COD\n\n---\n\nPriya Mehta\n42 MG Road Apt 3B, Near City Mall, Bengaluru\n560001\n9876543210\n\nCotton Kurta\nColour ;- red\nSize ;- M\n\n2 pcs\n999 Prepaid";
+"Name - Vansh sable\nProduct - Iphone 16 converter\nColour - orange\nAddress - Kawtha Kamthi Nagpur forno tech kampani\nPincode - 441002\nMobile - 9834551458\nQty - 1\nPrice - 799\nPayment - COD\n\n---\n\nPriya Mehta\n42 MG Road Apt 3B, Near City Mall, Bengaluru\n560001\n9876543210\n\nCotton Kurta\nColour ;- red\nSize ;- M\n\n2 pcs\n999 Prepaid";
   el("paste").focus();
 });
 
